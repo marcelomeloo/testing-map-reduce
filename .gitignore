@@ -7,6 +7,7 @@
 *.dll
 *.so
 *.dylib
+wordcount/wordcount
 
 # Test binary, built with `go test -c`
 *.test
@@ -23,3 +24,11 @@ go.work.sum
 
 # env file
 .env
+
+#wordcount /map /reduce /result files
+
+/wordcount/map/*
+/wordcount/reduce/*
+/wordcount/result/*
+
+#
