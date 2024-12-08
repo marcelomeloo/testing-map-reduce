@@ -2,8 +2,8 @@ package main
 
 import (
 	// "fmt"
+	"exame-final/mapreduce"
 	"hash/fnv"
-	"labMapReduce/mapreduce"
 
 	"strconv"
 	"strings"

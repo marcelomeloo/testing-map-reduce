@@ -1,8 +1,8 @@
 package main
 
 import (
+	"exame-final/mapreduce"
 	"flag"
-	"labMapReduce/mapreduce"
 	"log"
 	"os"
 	"strconv"

@@ -2,10 +2,10 @@ package main
 
 import (
 	"encoding/json"
+	"exame-final/mapreduce"
 	"fmt"
 	"io"
 	"io/ioutil"
-	"labMapReduce/mapreduce"
 	"log"
 	"os"
 	"path/filepath"
