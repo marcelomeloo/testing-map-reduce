@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wordcount-worker
+  labels:
+    app: wordcount-worker
+spec:
+  replicas: 3 # Número inicial de workers
+  selector:
+    matchLabels:
+      app: wordcount-worker
+  template:
+    metadata:
+      labels:
+        app: wordcount-worker
+    spec:
+      containers:
+      - name: worker
+        image: <seu-registry>/wordcount-worker:latest
+        ports:
+        - containerPort: 50001
+        resources:
+          limits:
+            cpu: "500m"
+            memory: "256Mi"
+          requests:
+            cpu: "250m"
+            memory: "128Mi"

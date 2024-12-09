@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wordcount-master
+  labels:
+    app: wordcount-master
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: wordcount-master
+  template:
+    metadata:
+      labels:
+        app: wordcount-master
+    spec:
+      containers:
+      - name: master
+        image: <seu-registry>/wordcount-master:latest
+        ports:
+        - containerPort: 50000
+        resources:
+          limits:
+            cpu: "500m"
+            memory: "256Mi"
+          requests:
+            cpu: "250m"
+            memory: "128Mi"

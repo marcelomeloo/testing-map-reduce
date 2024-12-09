@@ -2,74 +2,108 @@ package actions
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 	"os"
 	"os/exec"
 	"syscall"
+	"time"
 
 	"github.com/gobuffalo/buffalo"
 )
 
 func CountWords(c buffalo.Context) error {
-	// Obtém o nome do arquivo da URL
+	// Define um timeout de 2 segundos
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	// Canal para capturar o resultado
+	resultChan := make(chan map[string]string)
+	errorChan := make(chan error)
+
+	// Nome do arquivo vindo da URL
 	filename := c.Param("filename")
 
-	// Verifica se o arquivo existe
-	if err := verifyFile(filename); err != nil {
-		return c.Render(404, r.JSON(map[string]string{"error": err.Error()}))
-	}
+	// Inicia o processamento em uma goroutine separada
+	go func() {
+		// Verifica se o arquivo existe
+		if err := verifyFile(filename); err != nil {
+			errorChan <- fmt.Errorf("file not found: %v", err)
+			return
+		}
 
-	// Inicializa os workers
-	var workerCmds []*exec.Cmd
-	workers := []string{"50001", "50002", "50003"}
+		// Inicializa os workers
+		var workerCmds []*exec.Cmd
+		workers := []string{"50001", "50002", "50003"}
 
-	for _, port := range workers {
-		cmd, err := startWorker(port)
+		for _, port := range workers {
+			cmd, err := startWorker(port)
+			if err != nil {
+				errorChan <- fmt.Errorf("error starting worker: %v", err)
+				return
+			}
+			workerCmds = append(workerCmds, cmd)
+		}
+
+		// Inicializa o master
+		filename = "files/" + filename + ".txt"
+		masterCmd, err := startMaster(filename)
 		if err != nil {
-			return c.Render(500, r.JSON(map[string]string{"error": err.Error()}))
+			// Encerra os workers caso haja erro
+			for _, cmd := range workerCmds {
+				stopProcess(cmd)
+			}
+			errorChan <- fmt.Errorf("error starting master: %v", err)
+			return
 		}
-		workerCmds = append(workerCmds, cmd)
-	}
 
-	// Inicializa o master
-	filename = "files/" + filename + ".txt"
-	masterCmd, err := startMaster(filename)
-	if err != nil {
-		// Encerra os workers caso haja erro ao iniciar o master
+		// Aguarda o término do master
+		err = masterCmd.Wait()
+		if err != nil {
+			// Encerra os workers caso o master falhe
+			for _, cmd := range workerCmds {
+				stopProcess(cmd)
+			}
+			errorChan <- fmt.Errorf("master process failed: %v", err)
+			return
+		}
+
+		// Encerra os workers após o término do master
 		for _, cmd := range workerCmds {
 			stopProcess(cmd)
 		}
-		return c.Render(500, r.JSON(map[string]string{"error": err.Error()}))
-	}
 
-	// Aguardamos o término do master
-	err = masterCmd.Wait()
-	if err != nil {
-		// Encerra os workers caso o master falhe
-		for _, cmd := range workerCmds {
-			stopProcess(cmd)
+		// Lê o arquivo no path ../wordcount/result/result-final.txt
+		wordCount, err := readResultFile("../wordcount/result/result-final.txt")
+		if err != nil {
+			errorChan <- fmt.Errorf("failed to read result file: %v", err)
+			return
 		}
-		return c.Render(500, r.JSON(map[string]string{"error": fmt.Sprintf("master process failed: %v", err)}))
-	}
 
-	// Encerra os workers após o término do master
-	for _, cmd := range workerCmds {
-		stopProcess(cmd)
-	}
+		// Envia o resultado no canal
+		resultChan <- wordCount
+	}()
 
-	// Lê o arquivo no path ../wordcount/result/result-final.txt e popula wordCount
-	wordCount, err := readResultFile("../wordcount/result/result-final.txt")
-	if err != nil {
+	// Seleciona entre o timeout e o processamento
+	select {
+	case <-ctx.Done():
+		// Timeout expirou
+		defaultResponse := map[string]string{
+			"message": "Processing exceeded 2 seconds, returning default response.",
+		}
+		return c.Render(200, r.JSON(defaultResponse))
+	case err := <-errorChan:
+		// Erro durante o processamento
 		return c.Render(500, r.JSON(map[string]string{"error": err.Error()}))
+	case wordCount := <-resultChan:
+		// Resultado recebido dentro do tempo limite
+		return c.Render(200, r.JSON(wordCount))
 	}
-
-	// Retorna o resultado como JSON
-	return c.Render(200, r.JSON(wordCount))
 }
 
-// Função para ler o arquivo result-final.txt e convertê-lo em um map[string]int
+// Função para ler o arquivo result-final.txt e convertê-lo em um map[string]string
 func readResultFile(filepath string) (map[string]string, error) {
 	wordCount := make(map[string]string)
 
