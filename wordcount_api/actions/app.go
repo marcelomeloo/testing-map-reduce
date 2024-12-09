@@ -1,7 +1,6 @@
 package actions
 
 import (
-	"os"
 	"sync"
 	"wordcount_api/locales"
 
@@ -65,29 +64,6 @@ func App() *buffalo.App {
 	})
 
 	return app
-}
-
-func CountWords(c buffalo.Context) error {
-	// Obtém o nome do arquivo da URL
-	filename := c.Param("filename")
-	filepath := "../wordcount/files/" + filename + ".txt" // Pasta onde estão os arquivos
-
-	// Verifica se o arquivo existe
-	file, err := os.Open(filepath)
-	if err != nil {
-		return c.Render(404, r.JSON(map[string]string{
-			"error": "File not found",
-		}))
-	}
-	defer file.Close()
-
-	// Lógica de MapReduce para contar palavras
-	wordCount := map[string]string{
-		"teste": "2",
-	}
-
-	// Retorna o resultado como JSON
-	return c.Render(200, r.JSON(wordCount))
 }
 
 // translations will load locale files, set up the translator `actions.T`,
